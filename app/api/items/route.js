@@ -14,10 +14,11 @@ export async function POST(request) {
   }
   const categoryId = body.categoryId ?? null;
   const needed = body.needed === true;
+  const quantity = Math.max(1, Math.min(99, Number(body.quantity) || 1));
   const [row] = await sql`
-    INSERT INTO items (name, category_id, needed)
-    VALUES (${name}, ${categoryId}, ${needed})
-    RETURNING id, name, category_id AS "categoryId", needed, checked
+    INSERT INTO items (name, category_id, needed, quantity)
+    VALUES (${name}, ${categoryId}, ${needed}, ${quantity})
+    RETURNING id, name, category_id AS "categoryId", needed, checked, quantity
   `;
   return NextResponse.json(row, { status: 201 });
 }

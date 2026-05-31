@@ -57,8 +57,14 @@ export async function POST(request) {
         .slice(0, 80);
       if (!name) continue;
       const needed = typeof raw === "object" && raw?.needed === true;
+      const checked = typeof raw === "object" && raw?.checked === true;
+      const quantity =
+        typeof raw === "object"
+          ? Math.max(1, Math.min(99, Number(raw?.quantity) || 1))
+          : 1;
       inserts.push(
-        sql`INSERT INTO items (name, category_id, needed) VALUES (${name}, ${categoryId}, ${needed})`
+        sql`INSERT INTO items (name, category_id, needed, checked, quantity)
+            VALUES (${name}, ${categoryId}, ${needed}, ${checked}, ${quantity})`
       );
       createdItems += 1;
     }

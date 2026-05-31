@@ -129,10 +129,82 @@ main {
   cursor: default;
 }
 
+.search-wrap {
+  margin-bottom: 0.75rem;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+}
+
 .add-row {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.ghost-btn.active {
+  background: var(--green);
+  color: #fff;
+  border-style: solid;
+}
+
+.cat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.cat-order {
+  display: flex;
+  gap: 0.1rem;
+}
+
+/* Cantidad */
+.qty {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.qty-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.qty-btn:disabled {
+  opacity: 0.4;
+}
+
+.qty-num {
+  min-width: 1.2rem;
+  text-align: center;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .cat-select {
@@ -251,9 +323,9 @@ main {
   border: none;
   background: transparent;
   color: var(--muted);
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   cursor: pointer;
-  padding: 0.25rem 0.4rem;
+  padding: 0.2rem 0.3rem;
   border-radius: 8px;
   line-height: 1;
 }
