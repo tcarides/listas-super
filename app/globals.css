@@ -53,6 +53,30 @@ body {
   min-height: 1.1em;
 }
 
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.tab {
+  flex: 1;
+  padding: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.tab.active {
+  background: #fff;
+  color: var(--green-dark);
+}
+
 main {
   flex: 1;
   width: 100%;
@@ -103,6 +127,47 @@ main {
 .add-btn:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.add-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.cat-select {
+  flex: 1;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+}
+
+.ghost-btn {
+  flex: 0 0 auto;
+  padding: 0 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 1px dashed var(--green);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.cat-section {
+  margin-bottom: 1.25rem;
+}
+
+.cat-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--green-dark);
 }
 
 .list {
@@ -163,19 +228,37 @@ main {
   color: var(--muted);
 }
 
-.delete {
+/* Catálogo: productos no marcados se ven apagados; marcados, resaltados */
+.list-item.catalog .check {
+  color: var(--muted);
+  font-size: 1.2rem;
+}
+
+.list-item.catalog.needed {
+  border-color: var(--green);
+  background: #f0fdf4;
+}
+
+.list-item.catalog.needed .check {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.icon-btn {
   flex: 0 0 auto;
   border: none;
   background: transparent;
   color: var(--muted);
-  font-size: 1.3rem;
+  font-size: 1.15rem;
   cursor: pointer;
   padding: 0.25rem 0.4rem;
   border-radius: 8px;
   line-height: 1;
 }
 
-.delete:active {
+.icon-btn.danger:active {
   background: #fee2e2;
   color: var(--danger);
 }

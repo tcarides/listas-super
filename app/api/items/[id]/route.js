@@ -3,39 +3,40 @@ import { getSql, ensureSchema } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-// PATCH /api/items/:id  { done } o { name }  → marca/desmarca o renombra
+// PATCH /api/items/:id  { needed?, checked?, name?, categoryId? }
 export async function PATCH(request, { params }) {
   await ensureSchema();
   const sql = getSql();
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
 
-  if (typeof body.done === "boolean") {
-    const [row] = await sql`
-      UPDATE items SET done = ${body.done}
-      WHERE id = ${id}
-      RETURNING id, name, done
-    `;
-    return NextResponse.json(row || {});
+  if (typeof body.needed === "boolean") {
+    // Al sacar de la lista, también destildamos "comprado".
+    if (body.needed === false) {
+      await sql`UPDATE items SET needed = FALSE, checked = FALSE WHERE id = ${id}`;
+    } else {
+      await sql`UPDATE items SET needed = TRUE WHERE id = ${id}`;
+    }
   }
-
+  if (typeof body.checked === "boolean") {
+    await sql`UPDATE items SET checked = ${body.checked} WHERE id = ${id}`;
+  }
   if (typeof body.name === "string") {
     const name = body.name.trim().slice(0, 80);
-    if (!name) {
-      return NextResponse.json({ error: "El nombre está vacío" }, { status: 400 });
-    }
-    const [row] = await sql`
-      UPDATE items SET name = ${name}
-      WHERE id = ${id}
-      RETURNING id, name, done
-    `;
-    return NextResponse.json(row || {});
+    if (name) await sql`UPDATE items SET name = ${name} WHERE id = ${id}`;
+  }
+  if ("categoryId" in body) {
+    await sql`UPDATE items SET category_id = ${body.categoryId ?? null} WHERE id = ${id}`;
   }
 
-  return NextResponse.json({ error: "Nada para actualizar" }, { status: 400 });
+  const [row] = await sql`
+    SELECT id, name, category_id AS "categoryId", needed, checked
+    FROM items WHERE id = ${id}
+  `;
+  return NextResponse.json(row || {});
 }
 
-// DELETE /api/items/:id  → elimina un producto
+// DELETE /api/items/:id  → elimina del catálogo
 export async function DELETE(request, { params }) {
   await ensureSchema();
   const sql = getSql();

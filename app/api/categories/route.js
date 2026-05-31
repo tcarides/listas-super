@@ -3,21 +3,20 @@ import { getSql, ensureSchema } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-// POST /api/items  { name, categoryId?, needed? }  → agrega un producto al catálogo
+// POST /api/categories  { name }  → crea una sección
 export async function POST(request) {
   await ensureSchema();
   const sql = getSql();
   const body = await request.json().catch(() => ({}));
-  const name = (body.name || "").trim().slice(0, 80);
+  const name = (body.name || "").trim().slice(0, 60);
   if (!name) {
     return NextResponse.json({ error: "El nombre está vacío" }, { status: 400 });
   }
-  const categoryId = body.categoryId ?? null;
-  const needed = body.needed === true;
+  const [{ max }] = await sql`SELECT COALESCE(MAX(position), 0) AS max FROM categories`;
   const [row] = await sql`
-    INSERT INTO items (name, category_id, needed)
-    VALUES (${name}, ${categoryId}, ${needed})
-    RETURNING id, name, category_id AS "categoryId", needed, checked
+    INSERT INTO categories (name, position)
+    VALUES (${name}, ${Number(max) + 1})
+    RETURNING id, name, position
   `;
   return NextResponse.json(row, { status: 201 });
 }
