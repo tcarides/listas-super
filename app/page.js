@@ -20,6 +20,7 @@ export default function Home() {
   const [draftCat, setDraftCat] = useState("");
   const [catQuery, setCatQuery] = useState("");
   const [listQuery, setListQuery] = useState("");
+  const [hideChecked, setHideChecked] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [editing, setEditing] = useState(null); // item en edición
   const pending = useRef(0);
@@ -246,10 +247,9 @@ export default function Home() {
   const neededItems = items.filter((i) => i.needed);
   const boughtCount = neededItems.filter((i) => i.checked).length;
 
-  const listFiltered = listQuery
-    ? neededItems.filter((i) => norm(i.name).includes(norm(listQuery)))
-    : neededItems;
-  const listaGroups = groupItems(listFiltered);
+  let listSource = hideChecked ? neededItems.filter((i) => !i.checked) : neededItems;
+  if (listQuery) listSource = listSource.filter((i) => norm(i.name).includes(norm(listQuery)));
+  const listaGroups = groupItems(listSource);
 
   const catFiltered = catQuery
     ? items.filter((i) => norm(i.name).includes(norm(catQuery)))
@@ -300,6 +300,9 @@ export default function Home() {
             query={listQuery}
             setQuery={setListQuery}
             hasItems={neededItems.length > 0}
+            hideChecked={hideChecked}
+            setHideChecked={setHideChecked}
+            boughtCount={boughtCount}
             onToggle={(it) => setChecked(it, !it.checked)}
             onRemove={(it) => setNeeded(it, false)}
             onQty={setQuantity}
@@ -402,26 +405,53 @@ function SearchBox({ query, setQuery, placeholder }) {
 }
 
 // ===================== Vista LISTA =====================
-function ListaView({ groups, loaded, query, setQuery, hasItems, onToggle, onRemove, onQty, onEdit }) {
+function ListaView({
+  groups,
+  loaded,
+  query,
+  setQuery,
+  hasItems,
+  hideChecked,
+  setHideChecked,
+  boughtCount,
+  onToggle,
+  onRemove,
+  onQty,
+  onEdit,
+}) {
+  let emptyMsg = null;
+  if (loaded && groups.length === 0) {
+    if (query) emptyMsg = "No hay productos que coincidan.";
+    else if (hideChecked && hasItems)
+      emptyMsg = "¡Todo lo que falta ya está comprado! 🎉";
+    else
+      emptyMsg = (
+        <>
+          Todavía no marcaste nada para comprar.
+          <br />
+          Andá a <strong>Catálogo</strong> y tocá lo que necesitás.
+        </>
+      );
+  }
+
   return (
     <>
       {hasItems && (
-        <SearchBox query={query} setQuery={setQuery} placeholder="Buscar en la lista…" />
+        <>
+          <SearchBox query={query} setQuery={setQuery} placeholder="Buscar en la lista…" />
+          <button
+            type="button"
+            className={"toggle-chip" + (hideChecked ? " active" : "")}
+            onClick={() => setHideChecked((v) => !v)}
+          >
+            <span className="toggle-dot" />
+            {hideChecked ? "Mostrando solo lo que falta" : "Ocultar comprados"}
+            {boughtCount > 0 && <span className="toggle-badge">{boughtCount}</span>}
+          </button>
+        </>
       )}
 
-      {loaded && groups.length === 0 && (
-        <p className="empty-state">
-          {query ? (
-            "No hay productos que coincidan."
-          ) : (
-            <>
-              Todavía no marcaste nada para comprar.
-              <br />
-              Andá a <strong>Catálogo</strong> y tocá lo que necesitás.
-            </>
-          )}
-        </p>
-      )}
+      {emptyMsg && <p className="empty-state">{emptyMsg}</p>}
 
       {groups.map((g) => {
         const ordered = [
