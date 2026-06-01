@@ -32,9 +32,13 @@ export async function PATCH(request, { params }) {
     const q = Math.max(1, Math.min(99, Number(body.quantity) || 1));
     await sql`UPDATE items SET quantity = ${q} WHERE id = ${id}`;
   }
+  if ("note" in body) {
+    const note = (body.note || "").trim().slice(0, 200) || null;
+    await sql`UPDATE items SET note = ${note} WHERE id = ${id}`;
+  }
 
   const [row] = await sql`
-    SELECT id, name, category_id AS "categoryId", needed, checked, quantity
+    SELECT id, name, category_id AS "categoryId", needed, checked, quantity, note
     FROM items WHERE id = ${id}
   `;
   return NextResponse.json(row || {});

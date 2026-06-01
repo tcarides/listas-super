@@ -12,7 +12,7 @@ export async function GET() {
     ORDER BY position ASC, name ASC
   `;
   const items = await sql`
-    SELECT id, name, category_id AS "categoryId", needed, checked, quantity
+    SELECT id, name, category_id AS "categoryId", needed, checked, quantity, note
     FROM items
     ORDER BY name ASC
   `;

@@ -62,9 +62,11 @@ export async function POST(request) {
         typeof raw === "object"
           ? Math.max(1, Math.min(99, Number(raw?.quantity) || 1))
           : 1;
+      const note =
+        typeof raw === "object" ? (raw?.note || "").trim().slice(0, 200) || null : null;
       inserts.push(
-        sql`INSERT INTO items (name, category_id, needed, checked, quantity)
-            VALUES (${name}, ${categoryId}, ${needed}, ${checked}, ${quantity})`
+        sql`INSERT INTO items (name, category_id, needed, checked, quantity, note)
+            VALUES (${name}, ${categoryId}, ${needed}, ${checked}, ${quantity}, ${note})`
       );
       createdItems += 1;
     }

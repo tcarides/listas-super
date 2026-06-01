@@ -18,8 +18,10 @@ export default function Home() {
   const [view, setView] = useState("lista"); // "lista" | "catalogo"
   const [draft, setDraft] = useState("");
   const [draftCat, setDraftCat] = useState("");
-  const [query, setQuery] = useState("");
+  const [catQuery, setCatQuery] = useState("");
+  const [listQuery, setListQuery] = useState("");
   const [reordering, setReordering] = useState(false);
+  const [editing, setEditing] = useState(null); // item en edición
   const pending = useRef(0);
 
   // ---------- carga + sincronización ----------
@@ -70,7 +72,7 @@ export default function Home() {
   }
 
   async function patchItem(item, payload, optimistic) {
-    patchLocal(item.id, optimistic);
+    patchLocal(item.id, optimistic ?? payload);
     await mutate(async () => {
       const res = await fetch(`/api/items/${item.id}`, {
         method: "PATCH",
@@ -89,6 +91,20 @@ export default function Home() {
     return patchItem(item, { quantity: q }, { quantity: q });
   };
 
+  async function saveEdit(item, form) {
+    const name = form.name.trim();
+    if (!name) return;
+    const categoryId = form.categoryId ? Number(form.categoryId) : null;
+    const quantity = Math.max(1, Math.min(99, Number(form.quantity) || 1));
+    const note = form.note.trim();
+    setEditing(null);
+    await patchItem(
+      item,
+      { name, categoryId, quantity, note },
+      { name, categoryId, quantity, note: note || null }
+    );
+  }
+
   async function addItem(e) {
     e.preventDefault();
     const name = draft.trim();
@@ -98,7 +114,7 @@ export default function Home() {
     const tempId = "tmp-" + Date.now();
     setItems((prev) => [
       ...prev,
-      { id: tempId, name, categoryId, needed: true, checked: false, quantity: 1 },
+      { id: tempId, name, categoryId, needed: true, checked: false, quantity: 1, note: null },
     ]);
     await mutate(async () => {
       const res = await fetch("/api/items", {
@@ -112,29 +128,9 @@ export default function Home() {
     });
   }
 
-  async function renameItem(item) {
-    const next = prompt("Editar nombre:", item.name);
-    if (next == null) return;
-    const name = next.trim();
-    if (!name || name === item.name) return;
-    await patchItem(item, { name }, { name });
-  }
-
-  async function moveItem(item) {
-    const options = categories.map((c, i) => `${i + 1}. ${c.name}`).join("\n");
-    const ans = prompt(
-      `¿A qué sección movés "${item.name}"?\n\n${options}\n\n0. Sin categoría`,
-      ""
-    );
-    if (ans == null) return;
-    const n = Number(ans.trim());
-    if (Number.isNaN(n) || n < 0 || n > categories.length) return;
-    const categoryId = n === 0 ? null : categories[n - 1].id;
-    await patchItem(item, { categoryId }, { categoryId });
-  }
-
   async function deleteItem(item) {
     if (!confirm(`¿Eliminar "${item.name}" del catálogo?`)) return;
+    setEditing(null);
     setItems((prev) => prev.filter((i) => i.id !== item.id));
     if (typeof item.id === "string" && item.id.startsWith("tmp-")) return;
     await mutate(async () => {
@@ -203,7 +199,7 @@ export default function Home() {
     });
   }
 
-  // ---------- reset de compra ----------
+  // ---------- reset ----------
   async function resetTrip() {
     if (!confirm("¿Terminar la compra? Se va a vaciar la lista (el catálogo queda).")) return;
     setItems((prev) => prev.map((i) => ({ ...i, needed: false, checked: false })));
@@ -249,19 +245,23 @@ export default function Home() {
 
   const neededItems = items.filter((i) => i.needed);
   const boughtCount = neededItems.filter((i) => i.checked).length;
-  const listaGroups = groupItems(neededItems);
 
-  const catalogFiltered = query
-    ? items.filter((i) => norm(i.name).includes(norm(query)))
+  const listFiltered = listQuery
+    ? neededItems.filter((i) => norm(i.name).includes(norm(listQuery)))
+    : neededItems;
+  const listaGroups = groupItems(listFiltered);
+
+  const catFiltered = catQuery
+    ? items.filter((i) => norm(i.name).includes(norm(catQuery)))
     : items;
-  const catalogGroups = groupItems(catalogFiltered);
+  const catalogGroups = groupItems(catFiltered);
 
   // ---------- resumen ----------
   let summary = "Cargando…";
   if (loaded) {
     if (view === "lista") {
       if (neededItems.length === 0)
-        summary = "Tu lista está vacía — marcá productos en el Catálogo";
+        summary = "Lista vacía — marcá productos en el Catálogo";
       else if (boughtCount === neededItems.length) summary = "¡Compra completa! 🎉";
       else summary = `${boughtCount} de ${neededItems.length} comprados`;
     } else {
@@ -272,21 +272,23 @@ export default function Home() {
   return (
     <>
       <header className="app-header">
-        <h1>🛒 Lista del súper</h1>
-        <p className="summary">{summary}</p>
-        <div className="tabs" role="tablist">
-          <button
-            className={"tab" + (view === "lista" ? " active" : "")}
-            onClick={() => setView("lista")}
-          >
-            Lista{neededItems.length ? ` (${neededItems.length})` : ""}
-          </button>
-          <button
-            className={"tab" + (view === "catalogo" ? " active" : "")}
-            onClick={() => setView("catalogo")}
-          >
-            Catálogo
-          </button>
+        <div className="app-header-inner">
+          <h1>Lista del súper</h1>
+          <p className="summary">{summary}</p>
+          <div className="tabs" role="tablist">
+            <button
+              className={"tab" + (view === "lista" ? " active" : "")}
+              onClick={() => setView("lista")}
+            >
+              Lista{neededItems.length ? ` · ${neededItems.length}` : ""}
+            </button>
+            <button
+              className={"tab" + (view === "catalogo" ? " active" : "")}
+              onClick={() => setView("catalogo")}
+            >
+              Catálogo
+            </button>
+          </div>
         </div>
       </header>
 
@@ -295,9 +297,13 @@ export default function Home() {
           <ListaView
             groups={listaGroups}
             loaded={loaded}
+            query={listQuery}
+            setQuery={setListQuery}
+            hasItems={neededItems.length > 0}
             onToggle={(it) => setChecked(it, !it.checked)}
             onRemove={(it) => setNeeded(it, false)}
             onQty={setQuantity}
+            onEdit={setEditing}
           />
         ) : (
           <CatalogoView
@@ -308,8 +314,8 @@ export default function Home() {
             setDraft={setDraft}
             draftCat={draftCat}
             setDraftCat={setDraftCat}
-            query={query}
-            setQuery={setQuery}
+            query={catQuery}
+            setQuery={setCatQuery}
             reordering={reordering}
             setReordering={setReordering}
             onAdd={addItem}
@@ -317,9 +323,7 @@ export default function Home() {
             onRenameCategory={renameCategory}
             onMoveCategory={moveCategory}
             onToggleNeeded={(it) => setNeeded(it, !it.needed)}
-            onRename={renameItem}
-            onMove={moveItem}
-            onDelete={deleteItem}
+            onEdit={setEditing}
             onQty={setQuantity}
           />
         )}
@@ -334,6 +338,16 @@ export default function Home() {
             Terminar compra
           </button>
         </footer>
+      )}
+
+      {editing && (
+        <EditModal
+          item={editing}
+          categories={categories}
+          onClose={() => setEditing(null)}
+          onSave={saveEdit}
+          onDelete={deleteItem}
+        />
       )}
     </>
   );
@@ -359,27 +373,57 @@ function QtyStepper({ item, onQty }) {
         aria-label="Sumar"
         onClick={() => onQty(item, item.quantity + 1)}
       >
-        ＋
+        +
       </button>
     </div>
   );
 }
 
+// ===================== Buscador =====================
+function SearchBox({ query, setQuery, placeholder }) {
+  return (
+    <div className="search-wrap">
+      <span className="search-icon" aria-hidden>🔍</span>
+      <input
+        className="search-input"
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={placeholder}
+        aria-label="Buscar producto"
+      />
+      {query && (
+        <button className="search-clear" aria-label="Limpiar" onClick={() => setQuery("")}>
+          ✕
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ===================== Vista LISTA =====================
-function ListaView({ groups, loaded, onToggle, onRemove, onQty }) {
-  if (loaded && groups.length === 0) {
-    return (
-      <p className="empty-state">
-        Todavía no marcaste nada para comprar.
-        <br />
-        Andá a <strong>Catálogo</strong> y tocá los productos que necesitás.
-      </p>
-    );
-  }
+function ListaView({ groups, loaded, query, setQuery, hasItems, onToggle, onRemove, onQty, onEdit }) {
   return (
     <>
+      {hasItems && (
+        <SearchBox query={query} setQuery={setQuery} placeholder="Buscar en la lista…" />
+      )}
+
+      {loaded && groups.length === 0 && (
+        <p className="empty-state">
+          {query ? (
+            "No hay productos que coincidan."
+          ) : (
+            <>
+              Todavía no marcaste nada para comprar.
+              <br />
+              Andá a <strong>Catálogo</strong> y tocá lo que necesitás.
+            </>
+          )}
+        </p>
+      )}
+
       {groups.map((g) => {
-        // Comprados al fondo: pendientes arriba, tachados abajo.
         const ordered = [
           ...g.items.filter((i) => !i.checked),
           ...g.items.filter((i) => i.checked),
@@ -398,10 +442,19 @@ function ListaView({ groups, loaded, onToggle, onRemove, onQty }) {
                   >
                     {it.checked ? "✓" : ""}
                   </button>
-                  <span className="name" onClick={() => onToggle(it)}>
-                    {it.name}
-                  </span>
+                  <div className="item-main" onClick={() => onToggle(it)}>
+                    <span className="name">{it.name}</span>
+                    {it.note && <span className="note">{it.note}</span>}
+                  </div>
                   <QtyStepper item={it} onQty={onQty} />
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label="Editar"
+                    onClick={() => onEdit(it)}
+                  >
+                    ✎
+                  </button>
                   <button
                     type="button"
                     className="icon-btn"
@@ -438,23 +491,12 @@ function CatalogoView({
   onRenameCategory,
   onMoveCategory,
   onToggleNeeded,
-  onRename,
-  onMove,
-  onDelete,
+  onEdit,
   onQty,
 }) {
   return (
     <>
-      <div className="search-wrap">
-        <input
-          className="search-input"
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="🔍 Buscar producto…"
-          aria-label="Buscar producto"
-        />
-      </div>
+      <SearchBox query={query} setQuery={setQuery} placeholder="Buscar producto…" />
 
       <form className="add-form" onSubmit={onAdd} autoComplete="off">
         <input
@@ -468,7 +510,7 @@ function CatalogoView({
           maxLength={80}
         />
         <button type="submit" className="add-btn" aria-label="Agregar" disabled={!draft.trim()}>
-          ＋
+          +
         </button>
       </form>
 
@@ -547,35 +589,20 @@ function CatalogoView({
                   aria-label={it.needed ? "Sacar de la lista" : "Agregar a la lista"}
                   onClick={() => onToggleNeeded(it)}
                 >
-                  {it.needed ? "✓" : "＋"}
+                  {it.needed ? "✓" : ""}
                 </button>
-                <span className="name" onClick={() => onToggleNeeded(it)}>
-                  {it.name}
-                </span>
+                <div className="item-main" onClick={() => onToggleNeeded(it)}>
+                  <span className="name">{it.name}</span>
+                  {it.note && <span className="note">{it.note}</span>}
+                </div>
                 {it.needed && <QtyStepper item={it} onQty={onQty} />}
                 <button
                   type="button"
                   className="icon-btn"
                   aria-label="Editar"
-                  onClick={() => onRename(it)}
+                  onClick={() => onEdit(it)}
                 >
                   ✎
-                </button>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  aria-label="Mover de sección"
-                  onClick={() => onMove(it)}
-                >
-                  ⇄
-                </button>
-                <button
-                  type="button"
-                  className="icon-btn danger"
-                  aria-label="Eliminar"
-                  onClick={() => onDelete(it)}
-                >
-                  ✕
                 </button>
               </li>
             ))}
@@ -583,5 +610,103 @@ function CatalogoView({
         </section>
       ))}
     </>
+  );
+}
+
+// ===================== Modal de edición =====================
+function EditModal({ item, categories, onClose, onSave, onDelete }) {
+  const [name, setName] = useState(item.name);
+  const [categoryId, setCategoryId] = useState(item.categoryId ? String(item.categoryId) : "");
+  const [quantity, setQuantity] = useState(item.quantity || 1);
+  const [note, setNote] = useState(item.note || "");
+
+  function submit(e) {
+    e.preventDefault();
+    onSave(item, { name, categoryId, quantity, note });
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-handle" />
+        <h3 className="modal-title">Editar producto</h3>
+        <form onSubmit={submit}>
+          <label className="field">
+            <span className="field-label">Nombre</span>
+            <input
+              className="field-input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={80}
+              autoFocus
+            />
+          </label>
+
+          <label className="field">
+            <span className="field-label">Sección</span>
+            <select
+              className="field-input"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+            >
+              <option value="">Sin categoría</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="field">
+            <span className="field-label">Cantidad</span>
+            <div className="qty big">
+              <button
+                type="button"
+                className="qty-btn"
+                disabled={quantity <= 1}
+                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+              >
+                −
+              </button>
+              <span className="qty-num">{quantity}</span>
+              <button
+                type="button"
+                className="qty-btn"
+                onClick={() => setQuantity((q) => Math.min(99, q + 1))}
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <label className="field">
+            <span className="field-label">Comentario</span>
+            <textarea
+              className="field-input"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Ej: tamaño grande, marca La Serenísima, sin sal…"
+              rows={2}
+              maxLength={200}
+            />
+          </label>
+
+          <div className="modal-actions">
+            <button type="button" className="btn-ghost danger" onClick={() => onDelete(item)}>
+              Eliminar
+            </button>
+            <div className="modal-actions-right">
+              <button type="button" className="btn-ghost" onClick={onClose}>
+                Cancelar
+              </button>
+              <button type="submit" className="btn-primary" disabled={!name.trim()}>
+                Guardar
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
